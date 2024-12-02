@@ -155,9 +155,10 @@ def evaluate(Qmodel, env, repeats):
 def update_parameters(current_model, target_model):
     target_model.load_state_dict(current_model.state_dict())
 
+state_history = []
 
-def main(gamma=0.99, lr=1e-3, min_episodes=20, eps=1, eps_decay=0.998, eps_min=0.01, update_step=10, batch_size=64, update_repeats=50,
-         num_episodes=3000, seed=42, max_memory_size=5000, lr_gamma=1, lr_step=100, measure_step=100,
+def main(gamma=0.99, lr=1e-3, min_episodes=20, eps=0.75, eps_decay=0.9995, eps_min=0.01, update_step=10, batch_size=64, update_repeats=50,
+         num_episodes=1000, seed=42, max_memory_size=5000, lr_gamma=1, lr_step=100, measure_step=100,
          measure_repeats=100, hidden_dim=64, env_name='CartPole-v1', cnn=False, horizon=np.inf, render=True, render_step=50):
     """
     Remark: Convergence is slow. Wait until around episode 2500 to see good performance.
@@ -232,6 +233,7 @@ def main(gamma=0.99, lr=1e-3, min_episodes=20, eps=1, eps_decay=0.998, eps_min=0
             i += 1
             action = select_action(Q_2, env, state, eps)
             state, reward, done, _ = env.step(action)
+            state_history.append(state)
 
             if i > horizon:
                 done = True
@@ -254,8 +256,14 @@ def main(gamma=0.99, lr=1e-3, min_episodes=20, eps=1, eps_decay=0.998, eps_min=0
         scheduler.step()
         eps = max(eps*eps_decay, eps_min)
 
-    return Q_1, performance
+    return Q_1, Q_2, performance
 
 
 if __name__ == '__main__':
-    main()
+    Q_1, Q_2, performance = main()
+
+    pos_range, pos_vel_range, angle_range, ang_vel_range = np.transpose([np.min(state_history,axis=0), np.max(state_history,axis=0)])
+    print('pos_range:%s\npos_vel_range:%s\nangle_range:%s\nang_vel_range:%s' % (pos_range, pos_vel_range, angle_range, ang_vel_range))
+    # torch.save(Q_1.state_dict(), 'saved/q1.pt')
+    # torch.save(Q_2.state_dict(), 'saved/q2.pt')
+
