@@ -128,44 +128,13 @@ def evaluate(Qmodel, env, repeats):
 
 
 def main(gamma=0.99, lr=1e-3, min_episodes=20, eps=1, eps_decay=0.9995, eps_min=0.01, update_step=10, batch_size=64, update_repeats=25,
-         num_episodes=5000, seed=42, max_memory_size=5000, measure_step=100,
-         measure_repeats=100, hidden_dim=64, env_name='CartPole-v1', cnn=False, horizon=np.inf, render=False, render_step=50,
-         double=True):
-    """
-    Remark: Convergence is slow. Wait until around episode 2500 to see good performance.
-
-    :param gamma: reward discount factor
-    :param lr: learning rate for the Q-Network
-    :param min_episodes: we wait "min_episodes" many episodes in order to aggregate enough data before starting to train
-    :param eps: probability to take a random action during training
-    :param eps_decay: after every episode "eps" is multiplied by "eps_decay" to reduces exploration over time
-    :param eps_min: minimal value of "eps"
-    :param update_step: after "update_step" many episodes the Q-Network is trained "update_repeats" many times with a
-    batch of size "batch_size" from the memory.
-    :param batch_size: see above
-    :param update_repeats: see above
-    :param num_episodes: the number of episodes played in total
-    :param seed: random seed for reproducibility
-    :param max_memory_size: size of the replay memory
-    :param lr_gamma: learning rate decay for the Q-Network
-    :param lr_step: every "lr_step" episodes we decay the learning rate
-    :param measure_step: every "measure_step" episode the performance is measured
-    :param measure_repeats: the amount of episodes played in to asses performance
-    :param hidden_dim: hidden dimensions for the Q_network
-    :param env_name: name of the gym environment
-    :param cnn: set to "True" when using environments with image observations like "Pong-v0"
-    :param horizon: number of steps taken in the environment before terminating the episode (prevents very long episodes)
-    :param render: if "True" renders the environment every "render_step" episodes
-    :param render_step: see above
-    :return: the trained Q-Network and the measured performances
-    """
+         num_episodes=5000, seed=42, max_memory_size=5000, measure_step=100, measure_repeats=100, hidden_dim=64, env_name='CartPole-v1',
+         render=False, render_step=50, double=True):
     torch.manual_seed(seed)
     np.random.seed(seed)
     random.seed(seed)
     env = gym.make(env_name)
     env.seed(seed)
-
-    state_history = []
 
     Q_1 = QNetwork(action_dim=env.action_space.n, state_dim=env.observation_space.shape[0],
                        hidden_dim=hidden_dim).to(device)
@@ -184,6 +153,7 @@ def main(gamma=0.99, lr=1e-3, min_episodes=20, eps=1, eps_decay=0.9995, eps_min=
         memory_1 = memory_2
 
     performance = []
+    episode_rewards = []
 
     for episode in range(num_episodes):
         # display the performance
@@ -202,24 +172,28 @@ def main(gamma=0.99, lr=1e-3, min_episodes=20, eps=1, eps_decay=0.9995, eps_min=
         if episode % 2 == 0:
             Q = Q_1
             memory = memory_1
+            q_i = 1
         else:
             Q = Q_2
             memory = memory_2
+            q_i = 2
 
         state = env.reset()
         memory.state.append(state)
 
         done = False
         i = 0
+
+        if double:
+            episode_rewards.append([q_i, 0])
+        else:
+            episode_rewards.append([1, 0])
+
         while not done:
             i += 1
             action = select_action(Q, env, state, eps)
 
             state, reward, done, _ = env.step(action)
-            state_history.append(state)
-
-            if i > horizon:
-                done = True
 
             # render the environment if render == True
             if render and episode % render_step == 0:
@@ -227,6 +201,7 @@ def main(gamma=0.99, lr=1e-3, min_episodes=20, eps=1, eps_decay=0.9995, eps_min=
 
             # save state, action, reward sequence
             memory.update(state, action, reward, done)
+            episode_rewards[-1][1] += reward
 
         if episode >= min_episodes and episode % update_step == 0:
             for _ in range(update_repeats):
@@ -236,13 +211,13 @@ def main(gamma=0.99, lr=1e-3, min_episodes=20, eps=1, eps_decay=0.9995, eps_min=
         # update eps
         eps = max(eps*eps_decay, eps_min)
 
-    return Q_1, Q_2, performance, state_history
+    return Q_1, Q_2, performance, episode_rewards
 
 
 if __name__ == '__main__':
-    Q_1, Q_2, performance, state_history = main()
+    Q_1, Q_2, performance, episode_rewards = main()
 
-    pos_range, pos_vel_range, angle_range, ang_vel_range = np.transpose([np.min(state_history,axis=0), np.max(state_history,axis=0)])
+    # pos_range, pos_vel_range, angle_range, ang_vel_range = np.transpose([np.min(state_history,axis=0), np.max(state_history,axis=0)])
     # print('pos_range:%s\npos_vel_range:%s\nangle_range:%s\nang_vel_range:%s' % (pos_range, pos_vel_range, angle_range, ang_vel_range))
     torch.save(Q_1.state_dict(), 'saved/q1.pt')
     torch.save(Q_2.state_dict(), 'saved/q2.pt')
