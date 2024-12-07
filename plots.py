@@ -19,12 +19,10 @@ Q2 = QNetwork(env.action_space.n, env.observation_space.shape[0], 64)
 Q1.load_state_dict(torch.load('saved-double/q1.pt', map_location=torch.device('cpu')))
 Q2.load_state_dict(torch.load('saved-double/q2.pt', map_location=torch.device('cpu')))
 
-
-episode_rewards = np.load('saved-double/episode-rewards.npy')
+episode_rewards = np.load('saved-double/rewards.npy')
 
 def show_reset_cartpole():
     env.render()
-
 
 def show_ang_ang_vel_img():
     # ang_abs = 0.25
@@ -57,9 +55,6 @@ def show_ang_ang_vel_img():
     print(output_q1_shaped.shape)
 
     chosen_action = output_q1_shaped[:,:,0] - output_q1_shaped[:,:,1]
-
-
-
 
     # Nicked from mpl docs
     top = cm.get_cmap('Oranges', 128)
