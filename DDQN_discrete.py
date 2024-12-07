@@ -34,31 +34,6 @@ class QNetwork(nn.Module):
 
 
 """
-If the observations are images we use CNNs.
-"""
-class QNetworkCNN(nn.Module):
-    def __init__(self, action_dim):
-        super(QNetworkCNN, self).__init__()
-
-        self.conv_1 = nn.Conv2d(3, 32, kernel_size=8, stride=4)
-        self.conv_2 = nn.Conv2d(32, 64, kernel_size=4, stride=3)
-        self.conv_3 = nn.Conv2d(64, 64, kernel_size=3, stride=1)
-        self.fc_1 = nn.Linear(8960, 512)
-        self.fc_2 = nn.Linear(512, action_dim)
-
-    def forward(self, inp):
-        inp = inp.view((1, 3, 210, 160))
-        x1 = F.relu(self.conv_1(inp))
-        x1 = F.relu(self.conv_2(x1))
-        x1 = F.relu(self.conv_3(x1))
-        x1 = torch.flatten(x1, 1)
-        x1 = F.leaky_relu(self.fc_1(x1))
-        x1 = self.fc_2(x1)
-
-        return x1
-
-
-"""
 memory to save the state, action, reward sequence from the current episode. 
 """
 class Memory:
@@ -152,14 +127,9 @@ def evaluate(Qmodel, env, repeats):
     return perform/repeats
 
 
-def update_parameters(current_model, target_model):
-    target_model.load_state_dict(current_model.state_dict())
-
-state_history = []
-
 def main(gamma=0.99, lr=1e-3, min_episodes=20, eps=1, eps_decay=0.9995, eps_min=0.01, update_step=10, batch_size=64, update_repeats=25,
          num_episodes=5000, seed=42, max_memory_size=5000, measure_step=100,
-         measure_repeats=100, hidden_dim=64, env_name='CartPole-v1', cnn=False, horizon=np.inf, render=True, render_step=50):
+         measure_repeats=100, hidden_dim=64, env_name='CartPole-v1', cnn=False, horizon=np.inf, render=False, render_step=50):
     """
     Remark: Convergence is slow. Wait until around episode 2500 to see good performance.
 
@@ -194,22 +164,17 @@ def main(gamma=0.99, lr=1e-3, min_episodes=20, eps=1, eps_decay=0.9995, eps_min=
     env = gym.make(env_name)
     env.seed(seed)
 
-    if cnn:
-        Q_1 = QNetworkCNN(action_dim=env.action_space.n).to(device)
-        Q_2 = QNetworkCNN(action_dim=env.action_space.n).to(device)
-    else:
-        Q_1 = QNetwork(action_dim=env.action_space.n, state_dim=env.observation_space.shape[0],
-                       hidden_dim=hidden_dim).to(device)
-        Q_2 = QNetwork(action_dim=env.action_space.n, state_dim=env.observation_space.shape[0],
-                       hidden_dim=hidden_dim).to(device)
-    # transfer parameters from Q_1 to Q_2
-    # update_parameters(Q_1, Q_2)
+    state_history = []
+
+    Q_1 = QNetworkCNN(action_dim=env.action_space.n).to(device)
+    Q_2 = QNetworkCNN(action_dim=env.action_space.n).to(device)
 
     optimizer_1 = torch.optim.Adam(Q_1.parameters(), lr=lr)
     optimizer_2 = torch.optim.Adam(Q_2.parameters(), lr=lr)
 
     memory_1 = Memory(max_memory_size)
     memory_2 = Memory(max_memory_size)
+
     performance = []
 
     for episode in range(num_episodes):
@@ -246,9 +211,9 @@ def main(gamma=0.99, lr=1e-3, min_episodes=20, eps=1, eps_decay=0.9995, eps_min=
             if i > horizon:
                 done = True
 
-            # # render the environment if render == True
-            # if render and episode % render_step == 0:
-            #     env.render()
+            # render the environment if render == True
+            if render and episode % render_step == 0:
+                env.render()
 
             # save state, action, reward sequence
             memory.update(state, action, reward, done)
@@ -258,17 +223,14 @@ def main(gamma=0.99, lr=1e-3, min_episodes=20, eps=1, eps_decay=0.9995, eps_min=
                 train(batch_size, Q_1, Q_2, optimizer_1, memory_1, gamma)
                 train(batch_size, Q_2, Q_1, optimizer_2, memory_2, gamma)
 
-            # transfer new parameter from Q_1 to Q_2
-            # update_parameters(Q_1, Q_2)
-
         # update eps
         eps = max(eps*eps_decay, eps_min)
 
-    return Q_1, Q_2, performance
+    return Q_1, Q_2, performance, state_history
 
 
 if __name__ == '__main__':
-    Q_1, Q_2, performance = main()
+    Q_1, Q_2, performance, state_history = main()
 
     pos_range, pos_vel_range, angle_range, ang_vel_range = np.transpose([np.min(state_history,axis=0), np.max(state_history,axis=0)])
     # print('pos_range:%s\npos_vel_range:%s\nangle_range:%s\nang_vel_range:%s' % (pos_range, pos_vel_range, angle_range, ang_vel_range))
