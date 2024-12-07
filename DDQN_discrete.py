@@ -127,8 +127,8 @@ def evaluate(Qmodel, env, repeats):
     return perform/repeats
 
 
-def main(gamma=0.99, lr=1e-3, min_episodes=20, eps=1, eps_decay=0.9995, eps_min=0.01, update_step=10, batch_size=64, update_repeats=25,
-         num_episodes=5000, seed=42, max_memory_size=5000, measure_step=100, measure_repeats=100, hidden_dim=64, env_name='CartPole-v1',
+def main(gamma=0.99, lr=1e-3, min_episodes=20, eps=1, eps_decay=0.999, eps_min=0.01, update_step=10, batch_size=64, update_repeats=25,
+         num_episodes=3000, seed=42, max_memory_size=5000, measure_step=100, measure_repeats=100, hidden_dim=64, env_name='CartPole-v1',
          render=False, render_step=50, double=True):
     torch.manual_seed(seed)
     np.random.seed(seed)
@@ -154,6 +154,7 @@ def main(gamma=0.99, lr=1e-3, min_episodes=20, eps=1, eps_decay=0.9995, eps_min=
 
     performance = []
     episode_rewards = []
+    epsilons = []
 
     for episode in range(num_episodes):
         # display the performance
@@ -163,12 +164,7 @@ def main(gamma=0.99, lr=1e-3, min_episodes=20, eps=1, eps_decay=0.9995, eps_min=
             print("rewards: ", performance[-1][1:])
             print("lr: ", lr)
             print("eps: ", eps)
-
-            if performance[-1][1] == 500 and performance[-1][2] == 500:
-                print('TRAINED')
-                break
         
-
         if episode % 2 == 0:
             Q = Q_1
             memory = memory_1
@@ -188,6 +184,8 @@ def main(gamma=0.99, lr=1e-3, min_episodes=20, eps=1, eps_decay=0.9995, eps_min=
             episode_rewards.append([q_i, 0])
         else:
             episode_rewards.append([1, 0])
+        
+        epsilons.append(eps)
 
         while not done:
             i += 1
@@ -211,14 +209,4 @@ def main(gamma=0.99, lr=1e-3, min_episodes=20, eps=1, eps_decay=0.9995, eps_min=
         # update eps
         eps = max(eps*eps_decay, eps_min)
 
-    return Q_1, Q_2, performance, episode_rewards
-
-
-if __name__ == '__main__':
-    Q_1, Q_2, performance, episode_rewards = main()
-
-    # pos_range, pos_vel_range, angle_range, ang_vel_range = np.transpose([np.min(state_history,axis=0), np.max(state_history,axis=0)])
-    # print('pos_range:%s\npos_vel_range:%s\nangle_range:%s\nang_vel_range:%s' % (pos_range, pos_vel_range, angle_range, ang_vel_range))
-    torch.save(Q_1.state_dict(), 'saved/q1.pt')
-    torch.save(Q_2.state_dict(), 'saved/q2.pt')
-
+    return Q_1, Q_2, performance, episode_rewards, epsilons
