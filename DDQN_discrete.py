@@ -129,7 +129,8 @@ def evaluate(Qmodel, env, repeats):
 
 def main(gamma=0.99, lr=1e-3, min_episodes=20, eps=1, eps_decay=0.9995, eps_min=0.01, update_step=10, batch_size=64, update_repeats=25,
          num_episodes=5000, seed=42, max_memory_size=5000, measure_step=100,
-         measure_repeats=100, hidden_dim=64, env_name='CartPole-v1', cnn=False, horizon=np.inf, render=False, render_step=50):
+         measure_repeats=100, hidden_dim=64, env_name='CartPole-v1', cnn=False, horizon=np.inf, render=False, render_step=50,
+         double=True):
     """
     Remark: Convergence is slow. Wait until around episode 2500 to see good performance.
 
@@ -166,8 +167,10 @@ def main(gamma=0.99, lr=1e-3, min_episodes=20, eps=1, eps_decay=0.9995, eps_min=
 
     state_history = []
 
-    Q_1 = QNetworkCNN(action_dim=env.action_space.n).to(device)
-    Q_2 = QNetworkCNN(action_dim=env.action_space.n).to(device)
+    Q_1 = QNetwork(action_dim=env.action_space.n, state_dim=env.observation_space.shape[0],
+                       hidden_dim=hidden_dim).to(device)
+    Q_2 = QNetwork(action_dim=env.action_space.n, state_dim=env.observation_space.shape[0],
+                    hidden_dim=hidden_dim).to(device)
 
     optimizer_1 = torch.optim.Adam(Q_1.parameters(), lr=lr)
     optimizer_2 = torch.optim.Adam(Q_2.parameters(), lr=lr)
@@ -175,15 +178,14 @@ def main(gamma=0.99, lr=1e-3, min_episodes=20, eps=1, eps_decay=0.9995, eps_min=
     memory_1 = Memory(max_memory_size)
     memory_2 = Memory(max_memory_size)
 
+    if not double:
+        Q_1 = Q_2
+        optimizer_1 = optimizer_2
+        memory_1 = memory_2
+
     performance = []
 
     for episode in range(num_episodes):
-        if episode % 2 == 0:
-            Q = Q_1
-            memory = memory_1
-        else:
-            Q = Q_2
-            memory = memory_2
         # display the performance
         if (episode % measure_step == 0) and episode >= min_episodes:
             performance.append([episode, evaluate(Q_1, env, measure_repeats), evaluate(Q_1, env, measure_repeats)])
@@ -195,6 +197,14 @@ def main(gamma=0.99, lr=1e-3, min_episodes=20, eps=1, eps_decay=0.9995, eps_min=
             if performance[-1][1] == 500 and performance[-1][2] == 500:
                 print('TRAINED')
                 break
+        
+
+        if episode % 2 == 0:
+            Q = Q_1
+            memory = memory_1
+        else:
+            Q = Q_2
+            memory = memory_2
 
         state = env.reset()
         memory.state.append(state)
