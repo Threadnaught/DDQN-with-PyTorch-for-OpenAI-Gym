@@ -208,10 +208,17 @@ def main(gamma=0.99, lr=1e-3, min_episodes=20, eps=1, eps_decay=0.9995, eps_min=
     optimizer_1 = torch.optim.Adam(Q_1.parameters(), lr=lr)
     optimizer_2 = torch.optim.Adam(Q_2.parameters(), lr=lr)
 
-    memory = Memory(max_memory_size)
+    memory_1 = Memory(max_memory_size)
+    memory_2 = Memory(max_memory_size)
     performance = []
 
     for episode in range(num_episodes):
+        if episode % 2 == 0:
+            Q = Q_1
+            memory = memory_1
+        else:
+            Q = Q_2
+            memory = memory_2
         # display the performance
         if (episode % measure_step == 0) and episode >= min_episodes:
             performance.append([episode, evaluate(Q_1, env, measure_repeats), evaluate(Q_1, env, measure_repeats)])
@@ -231,10 +238,7 @@ def main(gamma=0.99, lr=1e-3, min_episodes=20, eps=1, eps_decay=0.9995, eps_min=
         i = 0
         while not done:
             i += 1
-            if episode % 2 == 0:
-                action = select_action(Q_1, env, state, eps)
-            else:
-                action = select_action(Q_2, env, state, eps)
+            action = select_action(Q, env, state, eps)
 
             state, reward, done, _ = env.step(action)
             state_history.append(state)
@@ -251,8 +255,8 @@ def main(gamma=0.99, lr=1e-3, min_episodes=20, eps=1, eps_decay=0.9995, eps_min=
 
         if episode >= min_episodes and episode % update_step == 0:
             for _ in range(update_repeats):
-                train(batch_size, Q_1, Q_2, optimizer_1, memory, gamma)
-                train(batch_size, Q_2, Q_1, optimizer_2, memory, gamma)
+                train(batch_size, Q_1, Q_2, optimizer_1, memory_1, gamma)
+                train(batch_size, Q_2, Q_1, optimizer_2, memory_2, gamma)
 
             # transfer new parameter from Q_1 to Q_2
             # update_parameters(Q_1, Q_2)
