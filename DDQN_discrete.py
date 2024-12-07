@@ -157,8 +157,8 @@ def update_parameters(current_model, target_model):
 
 state_history = []
 
-def main(gamma=0.99, lr=1e-3, min_episodes=20, eps=0.75, eps_decay=0.9995, eps_min=0.01, update_step=10, batch_size=64, update_repeats=50,
-         num_episodes=1000, seed=42, max_memory_size=5000, lr_gamma=1, lr_step=100, measure_step=100,
+def main(gamma=0.99, lr=1e-3, min_episodes=20, eps=1, eps_decay=0.9995, eps_min=0.01, update_step=10, batch_size=64, update_repeats=25,
+         num_episodes=5000, seed=42, max_memory_size=5000, measure_step=100,
          measure_repeats=100, hidden_dim=64, env_name='CartPole-v1', cnn=False, horizon=np.inf, render=True, render_step=50):
     """
     Remark: Convergence is slow. Wait until around episode 2500 to see good performance.
@@ -203,14 +203,10 @@ def main(gamma=0.99, lr=1e-3, min_episodes=20, eps=0.75, eps_decay=0.9995, eps_m
         Q_2 = QNetwork(action_dim=env.action_space.n, state_dim=env.observation_space.shape[0],
                        hidden_dim=hidden_dim).to(device)
     # transfer parameters from Q_1 to Q_2
-    update_parameters(Q_1, Q_2)
+    # update_parameters(Q_1, Q_2)
 
-    # we only train Q_1
-    for param in Q_2.parameters():
-        param.requires_grad = False
-
-    optimizer = torch.optim.Adam(Q_1.parameters(), lr=lr)
-    scheduler = StepLR(optimizer, step_size=lr_step, gamma=lr_gamma)
+    optimizer_1 = torch.optim.Adam(Q_1.parameters(), lr=lr)
+    optimizer_2 = torch.optim.Adam(Q_2.parameters(), lr=lr)
 
     memory = Memory(max_memory_size)
     performance = []
@@ -218,11 +214,15 @@ def main(gamma=0.99, lr=1e-3, min_episodes=20, eps=0.75, eps_decay=0.9995, eps_m
     for episode in range(num_episodes):
         # display the performance
         if (episode % measure_step == 0) and episode >= min_episodes:
-            performance.append([episode, evaluate(Q_1, env, measure_repeats)])
+            performance.append([episode, evaluate(Q_1, env, measure_repeats), evaluate(Q_1, env, measure_repeats)])
             print("Episode: ", episode)
-            print("rewards: ", performance[-1][1])
-            print("lr: ", scheduler.get_last_lr()[0])
+            print("rewards: ", performance[-1][1:])
+            print("lr: ", lr)
             print("eps: ", eps)
+
+            if performance[-1][1] == 500 and performance[-1][2] == 500:
+                print('TRAINED')
+                break
 
         state = env.reset()
         memory.state.append(state)
@@ -231,29 +231,33 @@ def main(gamma=0.99, lr=1e-3, min_episodes=20, eps=0.75, eps_decay=0.9995, eps_m
         i = 0
         while not done:
             i += 1
-            action = select_action(Q_2, env, state, eps)
+            if episode % 2 == 0:
+                action = select_action(Q_1, env, state, eps)
+            else:
+                action = select_action(Q_2, env, state, eps)
+
             state, reward, done, _ = env.step(action)
             state_history.append(state)
 
             if i > horizon:
                 done = True
 
-            # render the environment if render == True
-            if render and episode % render_step == 0:
-                env.render()
+            # # render the environment if render == True
+            # if render and episode % render_step == 0:
+            #     env.render()
 
             # save state, action, reward sequence
             memory.update(state, action, reward, done)
 
         if episode >= min_episodes and episode % update_step == 0:
             for _ in range(update_repeats):
-                train(batch_size, Q_1, Q_2, optimizer, memory, gamma)
+                train(batch_size, Q_1, Q_2, optimizer_1, memory, gamma)
+                train(batch_size, Q_2, Q_1, optimizer_2, memory, gamma)
 
             # transfer new parameter from Q_1 to Q_2
-            update_parameters(Q_1, Q_2)
+            # update_parameters(Q_1, Q_2)
 
-        # update learning rate and eps
-        scheduler.step()
+        # update eps
         eps = max(eps*eps_decay, eps_min)
 
     return Q_1, Q_2, performance
@@ -263,7 +267,7 @@ if __name__ == '__main__':
     Q_1, Q_2, performance = main()
 
     pos_range, pos_vel_range, angle_range, ang_vel_range = np.transpose([np.min(state_history,axis=0), np.max(state_history,axis=0)])
-    print('pos_range:%s\npos_vel_range:%s\nangle_range:%s\nang_vel_range:%s' % (pos_range, pos_vel_range, angle_range, ang_vel_range))
-    # torch.save(Q_1.state_dict(), 'saved/q1.pt')
-    # torch.save(Q_2.state_dict(), 'saved/q2.pt')
+    # print('pos_range:%s\npos_vel_range:%s\nangle_range:%s\nang_vel_range:%s' % (pos_range, pos_vel_range, angle_range, ang_vel_range))
+    torch.save(Q_1.state_dict(), 'saved/q1.pt')
+    torch.save(Q_2.state_dict(), 'saved/q2.pt')
 
