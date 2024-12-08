@@ -181,9 +181,7 @@ def imshow_q_generic(states, extent):
     plt.colorbar(label='Q(s,a0) - Q(s,1)')
 
 
-def ang_ang_vel_img():
-    # ang_abs = 0.25
-
+def ang_ang_vel_img(pos=0):
     angs = np.linspace(-0.25, 0.25, 10, dtype=np.float32)
     ang_vels = np.linspace(3,-3, 20, dtype=np.float32)
 
@@ -191,12 +189,29 @@ def ang_ang_vel_img():
     
     zeros = np.zeros_like(angs_grid, dtype=np.float32)
 
-    states = torch.permute(torch.asarray([zeros, zeros, angs_grid, ang_vels_grid]), [1,2,0])
+    states = torch.permute(torch.asarray([zeros + pos, zeros, angs_grid, ang_vels_grid]), [1,2,0])
 
     imshow_q_generic(states, [-0.25,0.25,-3,3])
 
     plt.xlabel('Pole Angle')
     plt.ylabel('Pole Angular Velocity')
+
+def pos_vel_img(theta=0):
+    # ang_abs = 0.25
+
+    poses = np.linspace(-1, 1, 10, dtype=np.float32)
+    vels = np.linspace(1,-1, 20, dtype=np.float32)
+
+    poses_grid, vels_grid = np.meshgrid(poses, vels)
+    
+    zeros = np.zeros_like(poses_grid, dtype=np.float32)
+
+    states = torch.permute(torch.asarray([poses_grid, vels_grid, zeros + theta, zeros]), [1,2,0])
+
+    imshow_q_generic(states, [-1,1,-1,1])
+
+    plt.xlabel('Pole Position')
+    plt.ylabel('Pole Linear Velocity')
 
 
 
@@ -233,5 +248,25 @@ def ang_ang_vel_img():
 # print('ep 1000: %f 2000: %f 3000: %f' % (epsilons[1000], epsilons[2000], epsilons[-1]))
 # plt.show()
 
-ang_ang_vel_img()
-plt.show()
+ang_ang_vel_img(-1)
+plt.savefig('images/ang-ang-vel--1.png')
+plt.clf()
+ang_ang_vel_img(0)
+plt.savefig('images/ang-ang-vel-0.png')
+plt.clf()
+ang_ang_vel_img(1)
+plt.savefig('images/ang-ang-vel-1.png')
+plt.clf()
+
+pos_vel_img(-0.1)
+plt.savefig('images/pos-vel--0.1.png')
+plt.clf()
+pos_vel_img(0)
+plt.savefig('images/pos-vel-0.png')
+plt.clf()
+pos_vel_img(0.1)
+plt.savefig('images/pos-vel-0.1.png')
+plt.clf()
+
+# pos_vel_img()
+# plt.show()
