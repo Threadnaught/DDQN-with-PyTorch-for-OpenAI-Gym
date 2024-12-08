@@ -159,7 +159,7 @@ def main(gamma=0.99, lr=1e-3, min_episodes=20, eps=1, eps_decay=0.999, eps_min=0
 	for episode in range(num_episodes):
 		# display the performance
 		if (episode % measure_step == 0) and episode >= min_episodes:
-			performance.append([episode, evaluate(Q_1, env, measure_repeats), evaluate(Q_1, env, measure_repeats)])
+			performance.append([episode, evaluate(Q_1, env, measure_repeats), evaluate(Q_2, env, measure_repeats)])
 			print("Episode: ", episode)
 			print("rewards: ", performance[-1][1:])
 			print("lr: ", lr)
