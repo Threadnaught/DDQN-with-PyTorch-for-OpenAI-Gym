@@ -129,7 +129,7 @@ def evaluate(Qmodel, env, repeats):
 
 def main(gamma=0.99, lr=1e-3, min_episodes=20, eps=1, eps_decay=0.999, eps_min=0.01, update_step=10, batch_size=64, update_repeats=25,
 		 num_episodes=3000, seed=42, max_memory_size=5000, measure_step=100, measure_repeats=100, hidden_dim=64, env_name='CartPole-v1',
-		 render=False, render_step=50, double=True):
+		 render=False, render_step=50, q1_var_record_step=1000, double=True):
 	torch.manual_seed(seed)
 	np.random.seed(seed)
 	random.seed(seed)
@@ -155,6 +155,7 @@ def main(gamma=0.99, lr=1e-3, min_episodes=20, eps=1, eps_decay=0.999, eps_min=0
 	performance = []
 	episode_rewards = []
 	epsilons = []
+	Q_1_history = {}
 
 	for episode in range(num_episodes):
 		# display the performance
@@ -205,8 +206,14 @@ def main(gamma=0.99, lr=1e-3, min_episodes=20, eps=1, eps_decay=0.999, eps_min=0
 			for _ in range(update_repeats):
 				train(batch_size, Q_1, Q_2, optimizer_1, memory_1, gamma)
 				train(batch_size, Q_2, Q_1, optimizer_2, memory_2, gamma)
+		
+		if episode > 0 and episode % q1_var_record_step == 0:
+			Q_1_copy = QNetwork(action_dim=env.action_space.n, state_dim=env.observation_space.shape[0],
+									hidden_dim=hidden_dim).to(device)
+			Q_1_copy.load_state_dict(Q_1.state_dict())
+			Q_1_history[episode] = Q_1_copy
 
 		# update eps
 		eps = max(eps*eps_decay, eps_min)
 
-	return Q_1, Q_2, performance, episode_rewards, epsilons
+	return Q_1, Q_2, performance, episode_rewards, epsilons, Q_1_history

@@ -13,15 +13,22 @@ from DDQN_discrete import *
 env = gym.make("CartPole-v1")
 env.reset()
 
-
-
 # Set up network
 Q1_single = QNetwork(env.action_space.n, env.observation_space.shape[0], 64)
+
 Q1 = QNetwork(env.action_space.n, env.observation_space.shape[0], 64)
+Q1_1000_episodes = QNetwork(env.action_space.n, env.observation_space.shape[0], 64)
+Q1_2000_episodes = QNetwork(env.action_space.n, env.observation_space.shape[0], 64)
+
 Q2 = QNetwork(env.action_space.n, env.observation_space.shape[0], 64)
+
+Q1_single.load_state_dict(torch.load('saved-single/q1.pt', map_location=torch.device('cpu')))
+
+Q1_1000_episodes.load_state_dict(torch.load('saved-double/q1-1000-episodes.pt', map_location=torch.device('cpu')))
+Q1_2000_episodes.load_state_dict(torch.load('saved-double/q1-2000-episodes.pt', map_location=torch.device('cpu')))
+
 Q1.load_state_dict(torch.load('saved-double/q1.pt', map_location=torch.device('cpu')))
 Q2.load_state_dict(torch.load('saved-double/q2.pt', map_location=torch.device('cpu')))
-Q1_single.load_state_dict(torch.load('saved-single/q1.pt', map_location=torch.device('cpu')))
 
 rewards = np.load('saved-double/rewards.npy')
 performance = np.load('saved-double/performance.npy')
@@ -180,13 +187,11 @@ def plot_q_overestimation(pos):
     Q1_double_left_val = Q1_double_output[:,1]
     Q1_double_right_val = Q1_double_output[:,0]
 
-    print(np.max(Q1_single_output.detach().cpu().numpy()))
-
     plt.plot(angs, Q1_single_left_val.detach().cpu().numpy(), '--', label='DQN left', color='C0')
     plt.plot(angs, Q1_single_right_val.detach().cpu().numpy(), '--', label='DQN right', color='C1')
 
-    plt.plot(angs, Q1_double_left_val.detach().cpu().numpy(), label='DQDN left', color='C0')
-    plt.plot(angs, Q1_double_right_val.detach().cpu().numpy(), label='DQDN right', color='C1')
+    plt.plot(angs, Q1_double_left_val.detach().cpu().numpy(), label='DDQN left', color='C0')
+    plt.plot(angs, Q1_double_right_val.detach().cpu().numpy(), label='DDQN right', color='C1')
 
     plt.ylabel('Q(s,a)')
     plt.xlabel('angle (rads)')
@@ -195,20 +200,58 @@ def plot_q_overestimation(pos):
     plt.ylim(-150,135)
 
 
-# reward_peformance_graph(0)
-# plt.savefig('images/r-p-graph-q1.png')
-# plt.clf()
+def plot_q_angles(Q):
+    plt.figure(figsize=[3.2,4.8])
+    angs = np.linspace(-0.25, 0.25, 20, dtype=np.float32)
+    zeros = np.zeros_like(angs)
 
-# reward_peformance_graph(1)
-# plt.savefig('images/r-p-graph-q2.png')
-# plt.clf()
+    states = torch.permute(torch.asarray([zeros, zeros, angs, zeros]), [1,0])
 
-# performance_comparison_graph()
-# plt.savefig('images/p-graph-both-qs.png')
-# plt.show()
+    Q1_double_output = Q(states)
+    Q1_double_left_val = Q1_double_output[:,1]
+    Q1_double_right_val = Q1_double_output[:,0]
+
+    plt.plot(angs, Q1_double_left_val.detach().cpu().numpy(), label='left', color='C0')
+    plt.plot(angs, Q1_double_right_val.detach().cpu().numpy(), label='right', color='C1')
+
+    plt.ylabel('Q(s,a)')
+    plt.xlabel('angle (rads)')
+
+    plt.legend()
+    plt.ylim(-150,135)
+
+reward_peformance_graph(0)
+plt.savefig('images/r-p-graph-q1.png')
+plt.clf()
+
+reward_peformance_graph(1)
+plt.savefig('images/r-p-graph-q2.png')
+plt.clf()
+
+performance_comparison_graph()
+plt.savefig('images/p-graph-both-qs.png')
+plt.clf()
 
 for pos in [-1,0,1]:
-    plt.clf()
     plot_q_overestimation(pos)
-    # plt.savefig('images/q-overestimation-%i.png' % pos)
+    plt.savefig('images/q-overestimation-%i.png' % pos)
     # plt.show()
+    plt.clf()
+
+plot_q_angles(Q1_1000_episodes)
+plt.savefig('images/q-1000-episodes.png')
+plt.clf()
+
+
+plot_q_angles(Q1_1000_episodes)
+plt.savefig('images/q-2000-episodes.png')
+plt.clf()
+
+
+plot_q_angles(Q1)
+plt.savefig('images/q-3000-episodes.png')
+plt.clf()
+
+# ep 1000: 0.367695 2000: 0.135200 3000: 0.049762
+print('ep 1000: %f 2000: %f 3000: %f' % (epsilons[1000], epsilons[2000], epsilons[-1]))
+# plt.show()
